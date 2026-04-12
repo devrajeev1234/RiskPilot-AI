@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  # ── MySQL ───────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "0109"
+      MYSQL_DATABASE:      loanguard
+    ports:
+      - "3307:3306"  # changed from 3306 to avoid host port conflict when local MySQL is already running
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p0109"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
+  # ── Python ML micro-service ─────────────────────────────────────
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health').status==200 else sys.exit(1)"]
+      interval: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Java Spring Boot backend ────────────────────────────────────
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      ml-service: { condition: service_healthy }
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SPRING_DATASOURCE_URL:      ${SPRING_DATASOURCE_URL:-jdbc:mysql://host.docker.internal:3306/loangaurd?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-0109}
+      RL_SERVICE_URL:             http://ml-service:8000
+      ML_SERVICE_URL:             http://ml-service:8000
+
+  # ── React frontend ─────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysqldata:
