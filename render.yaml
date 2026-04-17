@@ -1,20 +1,4 @@
 services:
-  # ── MySQL Database ───────────────────────────────────────────────
-  - type: pserv
-    name: mysql
-    env: docker
-    dockerfilePath: ./mysql/Dockerfile
-    envVars:
-      - key: MYSQL_ROOT_PASSWORD
-        generateValue: true
-      - key: MYSQL_DATABASE
-        value: loanguard
-    # disk: 
-    #   name: mysql-data
-    #   mountPath: /var/lib/mysql
-    #   sizeGB: 1
-    # Note: Disk requires a paid plan. Commented out for free tier testing.
-    # Without a persistent disk, database data clears on restart!
 
   # ── Python ML Microservice ───────────────────────────────────────
   - type: web
@@ -34,20 +18,11 @@ services:
       - key: PORT
         value: 8080
       - key: SPRING_DATASOURCE_URL
-        fromService:
-          type: pserv
-          name: mysql
-          envVarKey: RENDER_INTERNAL_URL
-      # Render internal URLs format to 'mysql:3306'. We will inject the correct JDBC string format:
-      - key: SPRING_DATASOURCE_URL
-        value: jdbc:mysql://mysql:3306/loanguard?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        sync: false
       - key: SPRING_DATASOURCE_USERNAME
-        value: root
+        sync: false
       - key: SPRING_DATASOURCE_PASSWORD
-        fromService:
-          type: pserv
-          name: mysql
-          envVarKey: MYSQL_ROOT_PASSWORD
+        sync: false
       - key: RL_SERVICE_URL
         value: http://ml-service:8000
       - key: ML_SERVICE_URL
